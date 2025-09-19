@@ -3,6 +3,15 @@
 # 强制设置终端支持颜色
 export TERM=xterm-256color
 
+
+# 一键安装
+# apt update
+# apt install -y curl
+# bash <(curl -L https://raw.githubusercontent.com/simtelboy/haogezhiming2/refs/heads/main/caddy_manager_improved.sh)
+# 
+# 一条语句安装: apt update -y && apt install -y curl && bash <(curl -L https://raw.githubusercontent.com/simtelboy/haogezhiming2/refs/heads/main/caddy_manager_improved.sh)
+
+
 # 颜色定义
 red='\033[0;31m'
 green='\033[0;32m'

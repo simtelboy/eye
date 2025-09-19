@@ -3,6 +3,7 @@
 # Caddy Auto Build System - 一键安装脚本
 # 作者: Your Name
 # 用途: 快速部署Caddy自动编译系统
+# bash <(curl -L https://raw.githubusercontent.com/simtelboy/eye/refs/heads/main/caddy-auto-updater/caddy_manager_improved.sh)
 
 set -e
 

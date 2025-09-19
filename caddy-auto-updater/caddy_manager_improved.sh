@@ -7,9 +7,9 @@ export TERM=xterm-256color
 # 一键安装
 # apt update
 # apt install -y curl
-# bash <(curl -L https://raw.githubusercontent.com/simtelboy/haogezhiming2/refs/heads/main/caddy_manager_improved.sh)
+# bash <(curl -L https://raw.githubusercontent.com/simtelboy/eye/refs/heads/main/caddy-auto-updater/caddy_manager_improved.sh)
 # 
-# 一条语句安装: apt update -y && apt install -y curl && bash <(curl -L https://raw.githubusercontent.com/simtelboy/haogezhiming2/refs/heads/main/caddy_manager_improved.sh)
+# 一条语句安装: apt update -y && apt install -y curl && bash <(curl -L https://raw.githubusercontent.com/simtelboy/eye/refs/heads/main/caddy-auto-updater/caddy_manager_improved.sh)
 
 
 # 颜色定义

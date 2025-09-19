@@ -3,15 +3,6 @@
 # 强制设置终端支持颜色
 export TERM=xterm-256color
 
-# 一键安装
-# apt update
-# apt install -y curl
-# bash <(curl -L https://raw.githubusercontent.com/simtelboy/eye/refs/heads/main/caddy-auto-updater/caddy_manager_improved.sh)
-# 
-# 一条语句安装: apt update -y && apt install -y curl && bash <(curl -L https://raw.githubusercontent.com/simtelboy/eye/refs/heads/main/caddy-auto-updater/caddy_manager_improved.sh)
-
-
-
 # 颜色定义
 red='\033[0;31m'
 green='\033[0;32m'
@@ -84,11 +75,12 @@ download_caddy_for_install() {
 
     log "下载天神之眼 Caddy: $filename"
     if download_with_retry "$download_url" "$filename"; then
-        log "设置执行权限..."
-        chmod +x "$filename"
+        log "重命名文件为 caddy..."
+        mv "$filename" "caddy"
+        chmod +x "caddy"
 
         log "执行天神之眼一键安装..."
-        if ./"$filename" install; then
+        if ./caddy install; then
             log "✅ 天神之眼安装成功"
             cd /
             rm -rf "$temp_dir"

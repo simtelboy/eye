@@ -72,8 +72,8 @@ if [[ "$UPLOAD_URL" == "null" || "$UPLOAD_URL" == "" ]]; then
 
     CREATE_DATA=$(jq -n \
         --arg tag "$VERSION" \
-        --arg name "Caddy $VERSION with ForwardProxy" \
-        --arg body "自动编译的 Caddy $VERSION，包含 ForwardProxy 模块\n\n本程序运行在debian11以上！" \
+        --arg name "天神之眼 $VERSION " \
+        --arg body "自动编译的 Caddy $VERSION，包含 ForwardProxy 模块，本程序运行在debian11以上！" \
         '{
             tag_name: $tag,
             name: $name,

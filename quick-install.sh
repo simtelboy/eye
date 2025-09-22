@@ -40,6 +40,39 @@ check_root() {
     fi
 }
 
+# 检查并设置北京时区
+check_and_set_timezone() {
+    log "检查系统时区设置..."
+    
+    current_timezone=$(timedatectl show --property=Timezone --value 2>/dev/null || echo "unknown")
+    
+    if [[ "$current_timezone" != "Asia/Shanghai" ]]; then
+        warning "当前时区: $current_timezone"
+        warning "Caddy自动编译系统需要设置为北京时间 (Asia/Shanghai)"
+        
+        echo -n "是否设置为北京时间? (y/N): "
+        read -r set_timezone
+        if [[ "$set_timezone" == "y" || "$set_timezone" == "Y" ]]; then
+            log "设置时区为北京时间..."
+            if timedatectl set-timezone Asia/Shanghai; then
+                log "时区设置成功"
+            else
+                error "设置时区失败，请手动执行: timedatectl set-timezone Asia/Shanghai"
+                exit 1
+            fi
+        else
+            error "安装已取消。请先设置时区为北京时间后再安装。"
+            echo "手动设置命令: timedatectl set-timezone Asia/Shanghai"
+            exit 1
+        fi
+    else
+        log "时区已设置为北京时间"
+    fi
+    
+    log "当前时间: $(date)"
+    echo "----------------------------------------------------------------"
+}
+
 # 检查系统兼容性
 check_system() {
     log "检查系统兼容性..."
@@ -159,6 +192,7 @@ main() {
     
     check_root
     check_system
+    check_and_set_timezone
     create_temp_dir
     download_project
     run_installation

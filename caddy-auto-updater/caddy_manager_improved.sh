@@ -287,38 +287,11 @@ check_caddy_status() {
     echo -e "${yellow}=== 监控完成 ===${none}"
 }
 
-# 计算服务器时间对应的本地时间
-calculate_server_time_for_local() {
-    local local_hour="$1"
-    local local_min="${2:-0}"
-
-    # 获取服务器时区偏移（小时）
-    local server_offset_str=$(date +%z)
-    local server_offset_hours=$((${server_offset_str:1:2}))
-    if [[ "${server_offset_str:0:1}" == "-" ]]; then
-        server_offset_hours=$((0 - server_offset_hours))
-    fi
-
-    # 假设用户在 UTC+8 时区（中国时间）
-    local user_offset_hours=8
-
-    # 计算时差
-    local time_diff=$((server_offset_hours - user_offset_hours))
-
-    # 计算服务器时间
-    local server_hour=$((local_hour + time_diff))
-    local server_day="Sun"
-
-    # 处理跨日期
-    if [[ $server_hour -lt 0 ]]; then
-        server_hour=$((server_hour + 24))
-        server_day="Sat"
-    elif [[ $server_hour -ge 24 ]]; then
-        server_hour=$((server_hour - 24))
-        server_day="Mon"
-    fi
-
-    printf "%s *-*-* %02d:%02d:00" "$server_day" "$server_hour" "$local_min"
+# 简化版：直接使用北京时间，无需转换
+get_beijing_time_schedule() {
+    local hour="$1"
+    local min="${2:-0}"
+    printf "Sun *-*-* %02d:%02d:00" "$hour" "$min"
 }
 
 # 自动更新功能
@@ -462,7 +435,7 @@ WantedBy=multi-user.target
 EOF
 
     # 计算正确的服务器时间（本地时间周日4点对应的服务器时间）
-    local server_time=$(calculate_server_time_for_local 4 0)  # 本地时间4:00
+    local server_time=$(get_beijing_time_schedule 4 0)  # 本地时间4:00
 
     # 创建 systemd 定时器
     cat > /etc/systemd/system/caddy-auto-update.timer << EOF

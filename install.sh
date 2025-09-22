@@ -182,7 +182,7 @@ Description=Run Caddy Auto Build Weekly
 Requires=caddy-auto-build.service
 
 [Timer]
-OnCalendar=Sat *-*-* 11:00:00
+OnCalendar=Sun *-*-* 02:00:00
 Persistent=true
 
 [Install]
@@ -202,9 +202,9 @@ echo "1. 编辑配置文件: nano /root/caddy-build-config.json"
 echo "2. 设置您的 GitHub Token (需要 repo 权限)"
 echo "3. 如需修改天神之眼代码的哈希值，请编辑配置文件"
 echo ""
-echo "定时任务已设置为每周六上午11点执行（服务器时间）"
-echo "  对应本地时间: 根据您的时区而定"
-echo "  运行 ./check-timezone.sh 查看详细时区对照"
+echo "定时任务已设置为每周日凌晨2点执行（北京时间）"
+echo "  系统时区已设置为北京时间，无需时区转换"
+echo "  运行 ./check-timezone.sh 查看定时器状态"
 echo ""
 echo "手动测试运行: /usr/local/bin/caddy-auto-build.sh"
 echo "单独测试上传: /usr/local/bin/upload-caddy.sh <文件路径> [版本]"

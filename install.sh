@@ -12,6 +12,42 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# 检查并设置北京时区
+check_and_set_timezone() {
+    echo "检查系统时区设置..."
+    
+    current_timezone=$(timedatectl show --property=Timezone --value 2>/dev/null || echo "unknown")
+    
+    if [[ "$current_timezone" != "Asia/Shanghai" ]]; then
+        echo "当前时区: $current_timezone"
+        echo "Caddy自动编译系统需要设置为北京时间 (Asia/Shanghai)"
+        
+        echo -n "是否设置为北京时间? (y/N): "
+        read -r set_timezone
+        if [[ "$set_timezone" == "y" || "$set_timezone" == "Y" ]]; then
+            echo "设置时区为北京时间..."
+            if timedatectl set-timezone Asia/Shanghai; then
+                echo "时区设置成功"
+            else
+                echo "错误: 设置时区失败，请手动执行: timedatectl set-timezone Asia/Shanghai"
+                exit 1
+            fi
+        else
+            echo "错误: 安装已取消。请先设置时区为北京时间后再安装。"
+            echo "手动设置命令: timedatectl set-timezone Asia/Shanghai"
+            exit 1
+        fi
+    else
+        echo "时区已设置为北京时间"
+    fi
+    
+    echo "当前时间: $(date)"
+    echo "----------------------------------------------------------------"
+}
+
+# 调用时区检查
+check_and_set_timezone
+
 # 更新系统包
 echo "更新系统包..."
 apt-get update

@@ -173,16 +173,16 @@ show_main_menu() {
     echo -e "${GREEN}编译和上传:${NC}"
     echo -e "  ${YELLOW}5)${NC} 自动编译"
     echo -e "  ${YELLOW}6)${NC} 强制编译 (忽略版本检查)"
-    echo -e "  ${YELLOW}6)${NC} 上传文件"
+    echo -e "  ${YELLOW}7)${NC} 上传文件"
     echo
     echo -e "${GREEN}系统检查:${NC}"
-    echo -e "  ${YELLOW}7)${NC} 检查时区"
+    echo -e "  ${YELLOW}8)${NC} 检查时区"
     echo
     echo -e "${GREEN}其他操作:${NC}"
-    echo -e "  ${YELLOW}8)${NC} 查看配置文件"
-    echo -e "  ${YELLOW}9)${NC} 查看系统状态"
-    echo -e "  ${YELLOW}10)${NC} 查看日志"
-    echo -e "  ${YELLOW}11)${NC} 重启编译服务（修改配置后使用）" 
+    echo -e "  ${YELLOW}9)${NC} 查看配置文件"
+    echo -e "  ${YELLOW}10)${NC} 查看系统状态"
+    echo -e "  ${YELLOW}11)${NC} 查看日志"
+    echo -e "  ${YELLOW}12)${NC} 重启编译服务（修改配置后使用）" 
     echo
     echo -e "  ${RED}0)${NC} 退出"
     echo

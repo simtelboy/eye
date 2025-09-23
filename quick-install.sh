@@ -3,6 +3,7 @@
 # 天神之眼 Auto Build System - 一键安装脚本
 # 作者: hotyi
 # 用途: 快速部署天神之眼自动编译系统
+#     bash <(curl -fsSL https://raw.githubusercontent.com/simtelboy/eye/main/quick-install.sh)
 
 set -e
 

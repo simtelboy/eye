@@ -3,7 +3,7 @@
 # 天神之眼 Auto Build System - 一键安装脚本
 # 作者: hotyi
 # 用途: 快速部署天神之眼自动编译系统
-#         bash <(curl -fsSL https://raw.githubusercontent.com/simtelboy/eye/main/quick-install.sh)
+#    bash <(curl -fsSL https://raw.githubusercontent.com/simtelboy/eye/main/quick-install.sh)
 
 set -e
 
@@ -194,24 +194,48 @@ execute_menu_choice() {
     
     case $choice in
         1)
-            log "执行快速部署..."
-            if [[ -f "$TEMP_DIR/deploy.sh" ]]; then
-                cd "$TEMP_DIR"
-                ./deploy.sh
-                # 部署完成后显示安装信息
-                show_post_install_info
+            warning "快速部署将安装天神之眼自动编译系统到您的服务器"
+            echo -e "${YELLOW}这将会：${NC}"
+            echo -e "  • 安装系统依赖包"
+            echo -e "  • 创建系统服务和定时器"
+            echo -e "  • 配置自动编译任务"
+            echo
+            echo -n "确认执行快速部署? (y/N): "
+            read -r confirm
+            if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                log "执行快速部署..."
+                if [[ -f "$TEMP_DIR/deploy.sh" ]]; then
+                    cd "$TEMP_DIR"
+                    ./deploy.sh
+                    # 部署完成后显示安装信息
+                    show_post_install_info
+                else
+                    error "deploy.sh 文件不存在"
+                fi
             else
-                error "deploy.sh 文件不存在"
+                warning "快速部署已取消"
             fi
             ;;
         2)
-            log "执行清理安装..."
-            if [[ -f "$TEMP_DIR/clean-install.sh" ]]; then
-                cd "$TEMP_DIR"
-                ./clean-install.sh
-                echo -e "${GREEN}清理完成！${NC}"
+             warning "清理安装将删除天神之眼自动编译系统的所有文件和服务"
+            echo -e "${YELLOW}这将会删除：${NC}"
+            echo -e "  • 系统服务和定时器"
+            echo -e "  • 配置文件和日志"
+            echo -e "  • 编译脚本和工具"
+            echo
+            echo -n "确认执行清理安装? (y/N): "
+            read -r confirm
+            if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                log "执行清理安装..."
+                if [[ -f "$TEMP_DIR/clean-install.sh" ]]; then
+                    cd "$TEMP_DIR"
+                    ./clean-install.sh
+                    echo -e "${GREEN}清理完成！${NC}"
+                else
+                    error "clean-install.sh 文件不存在"
+                fi
             else
-                error "clean-install.sh 文件不存在"
+                warning "清理安装已取消"
             fi
             ;;
         3)
@@ -225,13 +249,25 @@ execute_menu_choice() {
             fi
             ;;
         4)
-            log "删除系统依赖..."
-            if [[ -f "$TEMP_DIR/remove-dependencies.sh" ]]; then
-                cd "$TEMP_DIR"
-                ./remove-dependencies.sh
-                echo -e "${GREEN}依赖删除完成！${NC}"
+            warning "删除依赖将卸载天神之眼编译所需的系统依赖包"
+            echo -e "${YELLOW}这将会卸载：${NC}"
+            echo -e "  • Go 编译环境"
+            echo -e "  • xcaddy 工具"
+            echo -e "  • 其他编译依赖"
+            echo
+            echo -n "确认删除系统依赖? (y/N): "
+            read -r confirm
+            if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                log "删除系统依赖..."
+                if [[ -f "$TEMP_DIR/remove-dependencies.sh" ]]; then
+                    cd "$TEMP_DIR"
+                    ./remove-dependencies.sh
+                    echo -e "${GREEN}依赖删除完成！${NC}"
+                else
+                    error "remove-dependencies.sh 文件不存在"
+                fi
             else
-                error "remove-dependencies.sh 文件不存在"
+                warning "删除依赖已取消"
             fi
             ;;
         5)

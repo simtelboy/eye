@@ -182,7 +182,7 @@ Description=Run Caddy Auto Build Weekly
 Requires=caddy-auto-build.service
 
 [Timer]
-OnCalendar=Sun *-*-* 02:00:00
+OnCalendar=Mon *-*-* 02:00:00
 Persistent=true
 
 [Install]

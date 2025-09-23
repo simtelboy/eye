@@ -24,6 +24,18 @@ error_exit() {
     exit 1
 }
 
+# 检查是否为强制编译模式
+check_force_build() {
+    if [[ "$FORCE_BUILD" == "true" ]]; then
+        log "========== 强制编译模式已启用 =========="
+        log "⚠️  将跳过版本检查，强制重新编译"
+        log "⚠️  这将覆盖 GitHub 上的同版本文件"
+        return 0  # 强制编译模式
+    else
+        return 1  # 正常模式
+    fi
+}
+
 # 设置环境变量
 setup_environment() {
     # 确保使用正确的 Go 版本
@@ -640,7 +652,14 @@ upload_to_github_deprecated() {
 
 # 主函数
 main() {
-    log "========== Caddy 自动编译脚本开始 =========="
+    log "========== 天神之眼 自动编译脚本开始 =========="
+
+     # 检查是否为强制编译模式
+    local force_mode=false
+    if check_force_build; then
+        force_mode=true
+    fi
+
 
     # 设置环境变量
     setup_environment
@@ -661,26 +680,32 @@ main() {
     get_caddy_latest_version
     get_our_latest_version
     
-    # 比较版本
-    log "开始版本比较: Caddy $CADDY_LATEST vs 项目 $OUR_LATEST"
+    # 如果是强制编译模式，跳过版本比较
+    if [[ "$force_mode" == "true" ]]; then
+        log "🚀 强制编译模式：跳过版本比较，直接开始编译"
+        log "目标版本: $CADDY_LATEST"
+    else
+        # 正常模式：进行版本比较
+        log "开始版本比较: Caddy $CADDY_LATEST vs 项目 $OUR_LATEST"
 
-    # 临时禁用 set -e 以避免版本比较函数的返回值导致脚本退出
-    set +e
-    version_compare "$CADDY_LATEST" "$OUR_LATEST"
-    local compare_result=$?
-    set -e
+        # 临时禁用 set -e 以避免版本比较函数的返回值导致脚本退出
+        set +e
+        version_compare "$CADDY_LATEST" "$OUR_LATEST"
+        local compare_result=$?
+        set -e
 
-    log "版本比较返回值: $compare_result"
+        log "版本比较返回值: $compare_result"
 
-    if [[ $compare_result -eq 0 ]]; then
-        log "版本相同，无需更新"
-        exit 0
-    elif [[ $compare_result -eq 2 ]]; then
-        log "Caddy 官方版本 ($CADDY_LATEST) 低于或等于项目版本 ($OUR_LATEST)，无需更新"
-        exit 0
+        if [[ $compare_result -eq 0 ]]; then
+            log "版本相同，无需更新"
+            exit 0
+        elif [[ $compare_result -eq 2 ]]; then
+            log "Caddy 官方版本 ($CADDY_LATEST) 低于或等于项目版本 ($OUR_LATEST)，无需更新"
+            exit 0
+        fi
+
+        log "发现新版本！Caddy: $CADDY_LATEST > 项目: $OUR_LATEST"
     fi
-
-    log "发现新版本！Caddy: $CADDY_LATEST > 项目: $OUR_LATEST"
     
     # 编译 Caddy
     build_caddy

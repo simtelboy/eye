@@ -3,7 +3,6 @@
 # 天神之眼 Auto Build System - 一键安装脚本
 # 作者: hotyi
 # 用途: 快速部署天神之眼自动编译系统
-#   bash <(curl -fsSL https://raw.githubusercontent.com/simtelboy/eye/main/quick-install.sh)
 
 set -e
 
@@ -181,6 +180,7 @@ show_main_menu() {
     echo -e "  ${YELLOW}8)${NC} 查看配置文件"
     echo -e "  ${YELLOW}9)${NC} 查看系统状态"
     echo -e "  ${YELLOW}10)${NC} 查看日志"
+    echo -e "  ${YELLOW}11)${NC} 重启编译服务（修改配置后使用）" 
     echo
     echo -e "  ${RED}0)${NC} 退出"
     echo
@@ -304,6 +304,12 @@ execute_menu_choice() {
                 warning "日志文件不存在: /var/log/caddy-auto-build.log"
             fi
             ;;
+        11)
+            log "重启编译服务..."
+            systemctl daemon-reload
+            systemctl restart caddy-auto-build.timer
+            echo -e "${GREEN}编译服务已重启！${NC}"
+            ;;    
         0)
             log "退出程序"
             exit 0
@@ -318,7 +324,7 @@ execute_menu_choice() {
 interactive_menu() {
     while true; do
         show_main_menu
-        echo -n "请选择操作 (0-10): "
+        echo -n "请选择操作 (0-11): "
         read -r choice
         
         echo

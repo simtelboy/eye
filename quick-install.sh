@@ -323,22 +323,27 @@ execute_menu_choice() {
             ;;
         9)
             log "查看系统状态..."
-            echo -e "${GREEN}定时器状态:${NC}"
-            if systemctl is-enabled caddy-auto-build.timer >/dev/null 2>&1; then
-                systemctl status caddy-auto-build.timer --no-pager 2>/dev/null
+            echo -e "${GREEN}=== 定时器状态 ===${NC}"
+            if systemctl is-active --quiet caddy-auto-build.timer; then
+                echo "✅ 定时器正在运行"
+                systemctl show caddy-auto-build.timer --property=NextElapseUSecRealtime --value | xargs -I {} date -d @{} 2>/dev/null || echo "下次执行时间: 未知"
             else
-                echo "定时器未安装"
+                echo "❌ 定时器未运行"
             fi
+            
             echo
-            echo -e "${GREEN}服务状态:${NC}"
-            if systemctl list-unit-files caddy-auto-build.service >/dev/null 2>&1; then
-                systemctl status caddy-auto-build.service --no-pager 2>/dev/null
+            echo -e "${GREEN}=== 服务状态 ===${NC}"
+            if systemctl is-active --quiet caddy-auto-build.service; then
+                echo "🔄 服务正在运行 (编译中)"
+            elif systemctl is-failed --quiet caddy-auto-build.service; then
+                echo "❌ 服务执行失败"
             else
-                echo "服务未安装"
+                echo "✅ 服务正常 (等待中)"
             fi
+            
             echo
-            echo -e "${GREEN}下次执行时间:${NC}"
-            systemctl list-timers caddy-auto-build.timer --no-pager 2>/dev/null || echo "无定时器信息"
+            echo -e "${GREEN}=== 最近活动 ===${NC}"
+            journalctl -u caddy-auto-build.service --no-pager --lines=3 --since="1 day ago" 2>/dev/null || echo "无最近活动记录"
             ;;
         10)
             log "查看系统日志..."

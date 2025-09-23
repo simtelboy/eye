@@ -3,7 +3,6 @@
 # 天神之眼 Auto Build System - 一键安装脚本
 # 作者: hotyi
 # 用途: 快速部署天神之眼自动编译系统
-#    bash <(curl -fsSL https://raw.githubusercontent.com/simtelboy/eye/main/quick-install.sh)
 
 set -e
 
@@ -172,6 +171,7 @@ show_main_menu() {
     echo
     echo -e "${GREEN}编译和上传:${NC}"
     echo -e "  ${YELLOW}5)${NC} 自动编译"
+    echo -e "  ${YELLOW}6)${NC} 强制编译 (忽略版本检查)"
     echo -e "  ${YELLOW}6)${NC} 上传文件"
     echo
     echo -e "${GREEN}系统检查:${NC}"
@@ -281,6 +281,30 @@ execute_menu_choice() {
             fi
             ;;
         6)
+            warning "强制编译将忽略版本检查，重新编译并上传"
+            echo -e "${YELLOW}这将会：${NC}"
+            echo -e "  • 跳过版本号比较检查"
+            echo -e "  • 强制重新编译 Caddy"
+            echo -e "  • 覆盖 GitHub 上的同版本文件"
+            echo -e "  • 消耗服务器资源和时间"
+            echo
+            echo -n "确认执行强制编译? (y/N): "
+            read -r confirm
+            if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                log "执行强制编译..."
+                if [[ -f "$TEMP_DIR/caddy-auto-build.sh" ]]; then
+                    cd "$TEMP_DIR"
+                    # 设置环境变量强制编译
+                    FORCE_BUILD=true ./caddy-auto-build.sh
+                    echo -e "${GREEN}强制编译完成！${NC}"
+                else
+                    error "caddy-auto-build.sh 文件不存在"
+                fi
+            else
+                warning "强制编译已取消"
+            fi
+            ;;
+        7)
             log "上传天神之眼文件..."
             echo -n "请输入天神之眼文件路径: "
             read -r caddy_file_path
@@ -299,7 +323,7 @@ execute_menu_choice() {
                 error "upload-caddy.sh 文件不存在"
             fi
             ;;
-        7)
+        8)
             log "检查系统时区..."
             if [[ -f "$TEMP_DIR/check-timezone.sh" ]]; then
                 cd "$TEMP_DIR"
@@ -308,7 +332,7 @@ execute_menu_choice() {
                 error "check-timezone.sh 文件不存在"
             fi
             ;;
-        8)
+        9)
             log "查看配置文件..."
             if [[ -f "/root/caddy-build-config.json" ]]; then
                 echo -e "${GREEN}配置文件内容:${NC}"
@@ -321,7 +345,7 @@ execute_menu_choice() {
                 fi
             fi
             ;;
-         9)
+        10)
             log "查看系统状态..."
             echo -e "${GREEN}=== 定时器状态 ===${NC}"
             if systemctl is-active --quiet caddy-auto-build.timer; then
@@ -417,7 +441,7 @@ execute_menu_choice() {
             echo -e "${GREEN}=== 完整定时器信息 ===${NC}"
             systemctl list-timers caddy-auto-build.timer --no-pager 2>/dev/null || echo "无定时器信息"
             ;;
-        10)
+        11)
             log "查看系统日志..."
             if [[ -f "/var/log/caddy-auto-build.log" ]]; then
                 echo -e "${GREEN}最近20行日志:${NC}"
@@ -426,7 +450,7 @@ execute_menu_choice() {
                 warning "日志文件不存在: /var/log/caddy-auto-build.log"
             fi
             ;;
-        11)
+        12)
             log "重启编译服务..."
             systemctl daemon-reload
             systemctl restart caddy-auto-build.timer
@@ -446,7 +470,7 @@ execute_menu_choice() {
 interactive_menu() {
     while true; do
         show_main_menu
-        echo -n "请选择操作 (0-11): "
+        echo -n "请选择操作 (0-12): "
         read -r choice
         
         echo

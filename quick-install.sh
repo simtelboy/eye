@@ -324,10 +324,18 @@ execute_menu_choice() {
         9)
             log "查看系统状态..."
             echo -e "${GREEN}定时器状态:${NC}"
-            systemctl status caddy-auto-build.timer --no-pager 2>/dev/null || echo "定时器未安装"
+            if systemctl is-enabled caddy-auto-build.timer >/dev/null 2>&1; then
+                systemctl status caddy-auto-build.timer --no-pager 2>/dev/null
+            else
+                echo "定时器未安装"
+            fi
             echo
             echo -e "${GREEN}服务状态:${NC}"
-            systemctl status caddy-auto-build.service --no-pager 2>/dev/null || echo "服务未安装"
+            if systemctl list-unit-files caddy-auto-build.service >/dev/null 2>&1; then
+                systemctl status caddy-auto-build.service --no-pager 2>/dev/null
+            else
+                echo "服务未安装"
+            fi
             echo
             echo -e "${GREEN}下次执行时间:${NC}"
             systemctl list-timers caddy-auto-build.timer --no-pager 2>/dev/null || echo "无定时器信息"

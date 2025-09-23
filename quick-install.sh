@@ -321,7 +321,7 @@ execute_menu_choice() {
                 fi
             fi
             ;;
-        9)
+         9)
             log "查看系统状态..."
             echo -e "${GREEN}=== 定时器状态 ===${NC}"
             if systemctl is-active --quiet caddy-auto-build.timer; then
@@ -357,6 +357,56 @@ execute_menu_choice() {
                 echo "❌ 服务执行失败"
             else
                 echo "✅ 服务正常 (等待中)"
+            fi
+            
+            echo
+            echo -e "${GREEN}=== GitHub Token 状态 ===${NC}"
+            if [[ -f "/root/caddy-build-config.json" ]]; then
+                # 读取配置文件中的token
+                github_token=$(grep -o '"github_token"[[:space:]]*:[[:space:]]*"[^"]*"' /root/caddy-build-config.json | cut -d'"' -f4)
+                
+                if [[ -n "$github_token" && "$github_token" != "your_github_token_here" ]]; then
+                    echo "🔍 检查 GitHub Token 有效性..."
+                    
+                    # 测试token有效性
+                    response=$(curl -s -H "Authorization: token $github_token" https://api.github.com/user)
+                    
+                    if echo "$response" | grep -q '"login"'; then
+                        # 获取用户名
+                        username=$(echo "$response" | grep -o '"login"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+                        echo "✅ GitHub Token 有效"
+                        echo "👤 GitHub 用户: $username"
+                        
+                        # 检查仓库访问权限
+                        repo_response=$(curl -s -H "Authorization: token $github_token" https://api.github.com/repos/simtelboy/eye)
+                        if echo "$repo_response" | grep -q '"full_name"'; then
+                            echo "📁 仓库访问权限: ✅ 正常"
+                        else
+                            echo "📁 仓库访问权限: ❌ 无权限或仓库不存在"
+                        fi
+                        
+                        # 检查token权限范围
+                        scopes=$(curl -s -I -H "Authorization: token $github_token" https://api.github.com/user | grep -i "x-oauth-scopes" | cut -d' ' -f2- | tr -d '\r\n')
+                        if [[ -n "$scopes" ]]; then
+                            echo "🔐 Token 权限: $scopes"
+                        fi
+                        
+                    elif echo "$response" | grep -q "Bad credentials"; then
+                        echo "❌ GitHub Token 无效 (Bad credentials)"
+                        echo "💡 请检查 Token 是否正确或已过期"
+                    elif echo "$response" | grep -q "rate limit"; then
+                        echo "⚠️  GitHub API 请求限制"
+                        echo "💡 请稍后再试"
+                    else
+                        echo "❌ GitHub Token 验证失败"
+                        echo "📄 响应: $(echo "$response" | head -1)"
+                    fi
+                else
+                    echo "❌ GitHub Token 未配置或使用默认值"
+                    echo "💡 请编辑 /root/caddy-build-config.json 设置有效的 Token"
+                fi
+            else
+                echo "❌ 配置文件不存在: /root/caddy-build-config.json"
             fi
             
             echo

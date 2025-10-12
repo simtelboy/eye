@@ -10,6 +10,7 @@ env:
   SOURCE_REPO: simtelboy/caddysinglefile
   TARGET_REPO: simtelboy/eye
   FORWARDPROXY_COMMIT: 165adbd88c505fe98f6ba1cb8404d3c2d2edb793
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   check-version:
@@ -95,13 +96,14 @@ jobs:
               rm go1.21.5.linux-amd64.tar.gz
           ENV GOPATH=/root/go
           ENV PATH=/usr/local/go/bin:/root/go/bin:\$PATH
-          RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+          RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com" && \
+              go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
               go install github.com/mitchellh/gox@latest && \
               ls -la /root/go/bin/  # 调试：检查 xcaddy 是否安装
           WORKDIR /app
           COPY . .
           RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \
-              --with github.com/caddyserver/forwardproxy=github.com/simtelboy/forwardproxy2@${{ env.FORWARDPROXY_COMMIT }} && \
+              --with github.com/caddyserver/forwardproxy=github.com/simtelboy/caddysinglefile@${FORWARDPROXY_COMMIT} && \
               ls -la /app/  # 调试：检查 caddy 是否生成
           EOF
           # 构建并重命名二进制文件

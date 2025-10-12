@@ -3,7 +3,7 @@ name: Auto Build Caddy Single File
 on:
   schedule:
     # 每天星期一 UTC 凌晨 4:00（cron 格式: 分 时 日 月 周）
-    - cron: '0 4 * * 1'
+    - cron: '0 20 * * 1'
   # 可选：添加 manual 触发，便于测试
   workflow_dispatch:
 

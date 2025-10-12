@@ -91,7 +91,7 @@ jobs:
           # 创建 Dockerfile
           cat > Dockerfile << EOF
           FROM debian:11
-          RUN apt-get update && apt-get install -y wget git ca-certificates pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+          RUN apt-get update && apt-get install -y wget git ca-certificates pkg-config libssl-dev build-essential && rm -rf /var/lib/apt/lists/*
           RUN wget https://go.dev/dl/go1.25.2.linux-amd64.tar.gz && \
               tar -C /usr/local -xzf go1.25.2.linux-amd64.tar.gz && \
               rm go1.25.2.linux-amd64.tar.gz

@@ -2,7 +2,7 @@ name: Auto Build Caddy Single File
 
 on:
   schedule:
-    # 每天星期一 UTC 凌晨 4:00（cron 格式: 分 时 日 月 周）
+    # 每天星期一 UTC 凌晨 4:00（cron 格式: 分 时 日 月 周）已改为 20:00 UTC
     - cron: '0 20 * * 1'
   # 可选：添加 manual 触发，便于测试
   workflow_dispatch:
@@ -24,8 +24,19 @@ jobs:
       - name: Get latest Caddy version
         id: get-caddy
         run: |
-          # 使用 GitHub API 获取 Caddy 最新 Release 的 tag_name（去掉 v 前缀）
-          VERSION=$(curl -s https://api.github.com/repos/${{ env.CADDY_REPO }}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/v//')
+          # 安装 jq 用于解析 JSON
+          sudo apt-get update && sudo apt-get install -y jq
+          # 使用 GitHub API 获取 Caddy 最新 Release 的 tag_name
+          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ env.CADDY_REPO }}/releases/latest)
+          if [ $? -ne 0 ]; then
+            echo "Failed to fetch Caddy release data"
+            exit 1
+          fi
+          VERSION=$(echo "$RESPONSE" | jq -r '.tag_name' | sed 's/v//')
+          if [ -z "$VERSION" ]; then
+            echo "No valid tag_name found, using default version 0.0.0"
+            VERSION="0.0.0"
+          fi
           echo "caddy_version=$VERSION" >> $GITHUB_OUTPUT
           echo "Latest Caddy version: v$VERSION"
 
@@ -116,6 +127,6 @@ jobs:
             --repo ${{ env.TARGET_REPO }} || echo "Release already exists, updating..."
           
           # 如果已存在，上传资产（gh 会自动处理）
-          gh release upload "$TAG" "$ASSET_PATH" --repo ${{ env.TARGET_REPO }} --clobber
+          gh release upload "$TAG" $ASSET_PATH --repo ${{ env.TARGET_REPO }} --clobber
           
           echo "Released v$NEW_VERSION with binary: $ASSET_PATH"

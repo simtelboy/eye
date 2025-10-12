@@ -9,7 +9,7 @@ env:
   CADDY_REPO: caddyserver/caddy
   SOURCE_REPO: simtelboy/caddysinglefile
   TARGET_REPO: simtelboy/eye
-  FORWARDPROXY_COMMIT: 7d667f1ddd8a06fc1064181576052359af4b3e9a
+  FORWARDPROXY_COMMIT: b497ee4f792be508831cb60587ef446d825fe67d
 
 jobs:
   check-version:

@@ -93,17 +93,20 @@ jobs:
           RUN wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
               tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
               rm go1.21.5.linux-amd64.tar.gz
-          ENV PATH=/usr/local/go/bin:\$PATH
+          ENV GOPATH=/root/go
+          ENV PATH=/usr/local/go/bin:/root/go/bin:\$PATH
           RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
-              go install github.com/mitchellh/gox@latest
+              go install github.com/mitchellh/gox@latest && \
+              ls -la /root/go/bin/  # 调试：检查 xcaddy 是否安装
           WORKDIR /app
           COPY . .
-          RUN CGO_ENABLED=1 xcaddy build --output /app/caddy \
-              --with github.com/caddyserver/forwardproxy=github.com/simtelboy/forwardproxy2@${{ env.FORWARDPROXY_COMMIT }}
+          RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \
+              --with github.com/caddyserver/forwardproxy=github.com/simtelboy/forwardproxy2@${{ env.FORWARDPROXY_COMMIT }} && \
+              ls -la /app/  # 调试：检查 caddy 是否生成
           EOF
           # 构建并重命名二进制文件
           docker build -t caddy-build .
-          docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/caddy
+          docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/
           mv caddy caddy-v${NEW_VERSION}-linux-amd64
           echo "Built caddy binary: $(ls -la caddy-v${NEW_VERSION}-linux-amd64)"
 

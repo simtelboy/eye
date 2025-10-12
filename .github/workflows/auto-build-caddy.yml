@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should-build: ${{ steps.compare.outputs.should-build }}
-      new-version: ${{ steps.get-caddy.outputs.version }}
+      new-version: ${{ steps.get-caddy.outputs.caddy_version }}
     steps:
       - name: Get latest Caddy version
         id: get-caddy
@@ -88,6 +88,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
+          echo "Building with version: $NEW_VERSION"  # 调试输出
           # 创建 Dockerfile
           cat > Dockerfile << EOF
           FROM debian:11
@@ -118,6 +119,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
+          echo "Creating release with version: $NEW_VERSION"  # 调试输出
           TAG="v$NEW_VERSION"
           ASSET_PATH="caddy-v${NEW_VERSION}-linux-amd64"
           # 创建 Release

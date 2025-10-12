@@ -2,17 +2,14 @@ name: Auto Build Caddy Single File
 
 on:
   schedule:
-    # 每天星期一 UTC 凌晨 4:00（cron 格式: 分 时 日 月 周）已改为 20:00 UTC
     - cron: '0 20 * * 1'
-  # 可选：添加 manual 触发，便于测试
   workflow_dispatch:
 
-# 环境变量（全局）
 env:
   CADDY_REPO: caddyserver/caddy
   SOURCE_REPO: simtelboy/caddysinglefile
   TARGET_REPO: simtelboy/eye
-  FORWARDPROXY_COMMIT: 165adbd88c505fe98f6ba1cb8404d3c2d2edb793  # 您的 forwardproxy 插件 commit
+  FORWARDPROXY_COMMIT: 165adbd88c505fe98f6ba1cb8404d3c2d2edb793
 
 jobs:
   check-version:
@@ -24,9 +21,7 @@ jobs:
       - name: Get latest Caddy version
         id: get-caddy
         run: |
-          # 安装 jq 用于解析 JSON
           sudo apt-get update && sudo apt-get install -y jq
-          # 使用 GitHub API 获取 Caddy 最新 Release 的 tag_name
           RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ env.CADDY_REPO }}/releases/latest)
           if [ $? -ne 0 ]; then
             echo "Failed to fetch Caddy release data"
@@ -43,13 +38,12 @@ jobs:
       - name: Get current Eye version
         id: get-eye
         run: |
-          # 获取 eye 仓库最新 Release 的 tag_name（去掉 v 前缀）
           if [ -n "$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep 'tag_name')" ]; then
             VERSION=$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/v//')
             echo "current_version=$VERSION" >> $GITHUB_OUTPUT
             echo "Current Eye version: v$VERSION"
           else
-            echo "current_version=0.0.0" >> $GITHUB_OUTPUT  # 如果无 Release，默认旧版本
+            echo "current_version=0.0.0" >> $GITHUB_OUTPUT
             echo "No existing Eye release, will build"
           fi
 
@@ -59,8 +53,6 @@ jobs:
           NEW_VER="${{ steps.get-caddy.outputs.caddy_version }}"
           CUR_VER="${{ steps.get-eye.outputs.current_version }}"
           echo "Comparing $NEW_VER > $CUR_VER"
-          
-          # 简单 semver 比较（假设主版本/次版本递增；如需精确，使用 node-semver 但需安装 Node）
           if [[ "$NEW_VER" > "$CUR_VER" ]]; then
             echo "should-build=true" >> $GITHUB_OUTPUT
             echo "Newer version detected: $NEW_VER"
@@ -74,12 +66,12 @@ jobs:
     if: needs.check-version.outputs.should-build == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 允许创建 Release
+      contents: write
     steps:
       - name: Checkout Eye repo (for token)
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # 默认 token，用于 API 调用
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clone source repo
         uses: actions/checkout@v4
@@ -93,7 +85,8 @@ jobs:
 
       - name: Build Caddy using xcaddy in Debian 11
         run: |
-          # 创建 Dockerfile（临时，用于 Debian 11 + Go + xcaddy）
+          NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
+          # 创建 Dockerfile
           cat > Dockerfile << EOF
           FROM debian:11
           RUN apt-get update && apt-get install -y wget git ca-certificates pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
@@ -102,17 +95,17 @@ jobs:
               rm go1.21.5.linux-amd64.tar.gz
           ENV PATH=/usr/local/go/bin:\$PATH
           RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
-              go install github.com/mitchellh/gox@latest  # xcaddy 可能依赖
+              go install github.com/mitchellh/gox@latest
           WORKDIR /app
           COPY . .
           RUN CGO_ENABLED=1 xcaddy build --output /app/caddy \
               --with github.com/caddyserver/forwardproxy=github.com/simtelboy/forwardproxy2@${{ env.FORWARDPROXY_COMMIT }}
           EOF
-          
-          # 构建并提取二进制
+          # 构建并重命名二进制文件
           docker build -t caddy-build .
-          docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/
-          echo "Built caddy binary: $(ls -la caddy)"
+          docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/caddy
+          mv caddy caddy-v${NEW_VERSION}-linux-amd64
+          echo "Built caddy binary: $(ls -la caddy-v${NEW_VERSION}-linux-amd64)"
 
       - name: Create or update Release
         env:
@@ -120,13 +113,10 @@ jobs:
         run: |
           NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
           TAG="v$NEW_VERSION"
-          ASSET_PATH="caddy"
-          
-          # 使用 gh CLI 创建 Release（预装在 runner 中）
-          gh release create "$TAG" --title "Caddy Single File v$NEW_VERSION" --notes "Auto-built from caddysinglefile with forwardproxy2" "$ASSET_PATH" \
+          ASSET_PATH="caddy-v${NEW_VERSION}-linux-amd64"
+          # 创建 Release
+          gh release create "$TAG" --title "天神之眼 v${NEW_VERSION}" --notes "自动编译的天神之眼 v${NEW_VERSION}，本程序运行在debian11以上！" "$ASSET_PATH" \
             --repo ${{ env.TARGET_REPO }} || echo "Release already exists, updating..."
-          
-          # 如果已存在，上传资产（gh 会自动处理）
-          gh release upload "$TAG" $ASSET_PATH --repo ${{ env.TARGET_REPO }} --clobber
-          
-          echo "Released v$NEW_VERSION with binary: $ASSET_PATH"
+          # 上传资产
+          gh release upload "$TAG" "$ASSET_PATH" --repo ${{ env.TARGET_REPO }} --clobber
+          echo "Released v${NEW_VERSION} with binary: $ASSET_PATH"

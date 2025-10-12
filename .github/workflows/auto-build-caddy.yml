@@ -1,36 +1,121 @@
-# This is a basic workflow to help you get started with Actions
+name: Auto Build Caddy Single File
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
+  schedule:
+    # 每天星期一 UTC 凌晨 4:00（cron 格式: 分 时 日 月 周）
+    - cron: '0 4 * * 1'
+  # 可选：添加 manual 触发，便于测试
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# 环境变量（全局）
+env:
+  CADDY_REPO: caddyserver/caddy
+  SOURCE_REPO: simtelboy/caddysinglefile
+  TARGET_REPO: simtelboy/eye
+  FORWARDPROXY_COMMIT: 165adbd88c505fe98f6ba1cb8404d3c2d2edb793  # 您的 forwardproxy 插件 commit
+
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  check-version:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    outputs:
+      should-build: ${{ steps.compare.outputs.should-build }}
+      new-version: ${{ steps.get-caddy.outputs.version }}
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Get latest Caddy version
+        id: get-caddy
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          # 使用 GitHub API 获取 Caddy 最新 Release 的 tag_name（去掉 v 前缀）
+          VERSION=$(curl -s https://api.github.com/repos/${{ env.CADDY_REPO }}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/v//')
+          echo "caddy_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest Caddy version: v$VERSION"
+
+      - name: Get current Eye version
+        id: get-eye
+        run: |
+          # 获取 eye 仓库最新 Release 的 tag_name（去掉 v 前缀）
+          if [ -n "$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep 'tag_name')" ]; then
+            VERSION=$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/v//')
+            echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Current Eye version: v$VERSION"
+          else
+            echo "current_version=0.0.0" >> $GITHUB_OUTPUT  # 如果无 Release，默认旧版本
+            echo "No existing Eye release, will build"
+          fi
+
+      - name: Compare versions
+        id: compare
+        run: |
+          NEW_VER="${{ steps.get-caddy.outputs.caddy_version }}"
+          CUR_VER="${{ steps.get-eye.outputs.current_version }}"
+          echo "Comparing $NEW_VER > $CUR_VER"
+          
+          # 简单 semver 比较（假设主版本/次版本递增；如需精确，使用 node-semver 但需安装 Node）
+          if [[ "$NEW_VER" > "$CUR_VER" ]]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "Newer version detected: $NEW_VER"
+          else
+            echo "should-build=false" >> $GITHUB_OUTPUT
+            echo "No update needed"
+          fi
+
+  build-and-release:
+    needs: check-version
+    if: needs.check-version.outputs.should-build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 允许创建 Release
+    steps:
+      - name: Checkout Eye repo (for token)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # 默认 token，用于 API 调用
+
+      - name: Clone source repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          path: source
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker for Debian 11
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Caddy using xcaddy in Debian 11
+        run: |
+          # 创建 Dockerfile（临时，用于 Debian 11 + Go + xcaddy）
+          cat > Dockerfile << EOF
+          FROM debian:11
+          RUN apt-get update && apt-get install -y wget git ca-certificates pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+          RUN wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
+              tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
+              rm go1.21.5.linux-amd64.tar.gz
+          ENV PATH=/usr/local/go/bin:\$PATH
+          RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+              go install github.com/mitchellh/gox@latest  # xcaddy 可能依赖
+          WORKDIR /app
+          COPY . .
+          RUN CGO_ENABLED=1 xcaddy build --output /app/caddy \
+              --with github.com/caddyserver/forwardproxy=github.com/simtelboy/forwardproxy2@${{ env.FORWARDPROXY_COMMIT }}
+          EOF
+          
+          # 构建并提取二进制
+          docker build -t caddy-build .
+          docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/
+          echo "Built caddy binary: $(ls -la caddy)"
+
+      - name: Create or update Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
+          TAG="v$NEW_VERSION"
+          ASSET_PATH="caddy"
+          
+          # 使用 gh CLI 创建 Release（预装在 runner 中）
+          gh release create "$TAG" --title "Caddy Single File v$NEW_VERSION" --notes "Auto-built from caddysinglefile with forwardproxy2" "$ASSET_PATH" \
+            --repo ${{ env.TARGET_REPO }} || echo "Release already exists, updating..."
+          
+          # 如果已存在，上传资产（gh 会自动处理）
+          gh release upload "$TAG" "$ASSET_PATH" --repo ${{ env.TARGET_REPO }} --clobber
+          
+          echo "Released v$NEW_VERSION with binary: $ASSET_PATH"

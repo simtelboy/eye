@@ -111,13 +111,13 @@
             ARG FORWARDPROXY_COMMIT
             RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \
                 --with github.com/caddyserver/forwardproxy=github.com/simtelboy/caddysinglefile@${FORWARDPROXY_COMMIT} && \
+                chmod +x /app/caddy && \
                 ls -la /app/
             EOF
 
             docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} --build-arg FORWARDPROXY_COMMIT=${{ env.FORWARDPROXY_COMMIT }} -t caddy-build .
             docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/
             mv caddy caddy-v${NEW_VERSION}-linux-amd64
-            chmod +x caddy-v${NEW_VERSION}-linux-amd64
             echo "Built caddy binary: $(ls -lh caddy-v${NEW_VERSION}-linux-amd64)"
 
         - name: Create or update Release

@@ -10,7 +10,7 @@ name: Auto Build Caddy Single File
     SOURCE_REPO: simtelboy/caddysinglefile
     SOURCE_BRANCH: feature/rate-limit  # ✅ 新增：指定分支
     TARGET_REPO: simtelboy/eye
-    FORWARDPROXY_COMMIT: 72bbbd2700bb58354a55089e7271e3d04697d453
+    FORWARDPROXY_COMMIT: fd35bce86f7aa1d8e9ae26755fb13a23e5ffd72f
 
   jobs:
     check-version:

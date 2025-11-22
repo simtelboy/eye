@@ -125,9 +125,11 @@
             GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           run: |
             NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
-            echo "Creating release with version: $NEW_VERSION"
             TAG="v$NEW_VERSION"
             ASSET_PATH="caddy-v${NEW_VERSION}-linux-amd64"
+            BUILD_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+            echo "Creating release with version: $NEW_VERSION"
 
             cat > release_notes.md << 'NOTES_EOF'
             ## 天神之眼 v$NEW_VERSION
@@ -145,12 +147,11 @@
             ```
             NOTES_EOF
 
-            sed -i "s/\$NEW_VERSION/$NEW_VERSION/g" release_notes.md
-            sed -i "s/\$SOURCE_BRANCH/${{ env.SOURCE_BRANCH }}/g" release_notes.md
-            sed -i "s/\$BUILD_TIME/$(date -u '+%Y-%m-%d %H:%M:%S UTC')/g" release_notes.md
-            sed -i "s/\$TARGET_REPO/${{ env.TARGET_REPO }}/g" release_notes.md
-            sed -i "s/\$TAG/$TAG/g" release_notes.md
-            sed -i "s/\$ASSET_PATH/$ASSET_PATH/g" release_notes.md
+            sed -i "s|\$NEW_VERSION|$NEW_VERSION|g" release_notes.md
+            sed -i "s|\$BUILD_TIME|$BUILD_TIME|g" release_notes.md
+            sed -i "s|\$TARGET_REPO|${{ env.TARGET_REPO }}|g" release_notes.md
+            sed -i "s|\$TAG|$TAG|g" release_notes.md
+            sed -i "s|\$ASSET_PATH|$ASSET_PATH|g" release_notes.md
 
             gh release create "$TAG" --title "天神之眼 v${NEW_VERSION}" --notes-file release_notes.md "$ASSET_PATH" \
               --repo ${{ env.TARGET_REPO }} || echo "Release already exists"

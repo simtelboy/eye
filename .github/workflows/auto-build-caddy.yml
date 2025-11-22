@@ -132,16 +132,8 @@
             RELEASE_NOTES="## 天神之眼 v${NEW_VERSION}
 
             ### 📦 编译信息
-            - **Caddy 版本**: v${NEW_VERSION}
-            - **源代码分支**: \`${{ env.SOURCE_BRANCH }}\`
             - **编译时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
             - **运行环境**: Debian 11+
-
-            ### 🚀 功能特性
-            - ✅ 基于 Caddy v${NEW_VERSION}
-            - ✅ 集成正向代理功能
-            - ✅ 用户管理系统
-            - ✅ 流量统计与限速
 
             ### 📥 安装方法
             \`\`\`bash

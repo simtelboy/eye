@@ -152,7 +152,7 @@
             \`\`\`
 
             ---
-            🤖 本版本由 GitHub Actions 自动编译"
+            
 
             gh release create "$TAG" --title "天神之眼 v${NEW_VERSION}" --notes "$RELEASE_NOTES" "$ASSET_PATH" \
               --repo ${{ env.TARGET_REPO }} || echo "Release already exists"

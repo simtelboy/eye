@@ -1,163 +1,161 @@
-auto-build-caddy-final.yml                                                                                                                                                                         │
-│                                                                                                                                                                                                    │
-│ name: Auto Build Caddy Single File                                                                                                                                                                 │
-│                                                                                                                                                                                                    │
-│ on:                                                                                                                                                                                                │
-│   schedule:                                                                                                                                                                                        │
-│     - cron: '0 18 * * 0'                                                                                                                                                                           │
-│   workflow_dispatch:                                                                                                                                                                               │
-│                                                                                                                                                                                                    │
-│ env:                                                                                                                                                                                               │
-│   CADDY_REPO: caddyserver/caddy                                                                                                                                                                    │
-│   SOURCE_REPO: simtelboy/caddysinglefile                                                                                                                                                           │
-│   SOURCE_BRANCH: feature/rate-limit                                                                                                                                                                │
-│   TARGET_REPO: simtelboy/eye                                                                                                                                                                       │
-│   FORWARDPROXY_COMMIT: fd35bce86f7aa1d8e9ae26755fb13a23e5ffd72f                                                                                                                                    │
-│                                                                                                                                                                                                    │
-│ jobs:                                                                                                                                                                                              │
-│   check-version:                                                                                                                                                                                   │
-│     runs-on: ubuntu-latest                                                                                                                                                                         │
-│     outputs:                                                                                                                                                                                       │
-│       should-build: ${{ steps.compare.outputs.should-build }}                                                                                                                                      │
-│       new-version: ${{ steps.get-caddy.outputs.caddy_version }}                                                                                                                                    │
-│     steps:                                                                                                                                                                                         │
-│       - name: Get latest Caddy version                                                                                                                                                             │
-│         id: get-caddy                                                                                                                                                                              │
-│         run: |                                                                                                                                                                                     │
-│           sudo apt-get update && sudo apt-get install -y jq                                                                                                                                        │
-│           RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ env.CADDY_REPO }}/releases/latest)                                             │
-│           if [ $? -ne 0 ]; then                                                                                                                                                                    │
-│             echo "Failed to fetch Caddy release data"                                                                                                                                              │
-│             exit 1                                                                                                                                                                                 │
-│           fi                                                                                                                                                                                       │
-│           VERSION=$(echo "$RESPONSE" | jq -r '.tag_name' | sed 's/v//')                                                                                                                            │
-│           if [ -z "$VERSION" ]; then                                                                                                                                                               │
-│             echo "No valid tag_name found, using default version 0.0.0"                                                                                                                            │
-│             VERSION="0.0.0"                                                                                                                                                                        │
-│           fi                                                                                                                                                                                       │
-│           echo "caddy_version=$VERSION" >> $GITHUB_OUTPUT                                                                                                                                          │
-│           echo "Latest Caddy version: v$VERSION"                                                                                                                                                   │
-│                                                                                                                                                                                                    │
-│       - name: Get current Eye version                                                                                                                                                              │
-│         id: get-eye                                                                                                                                                                                │
-│         run: |                                                                                                                                                                                     │
-│           if [ -n "$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep 'tag_name')" ]; then                                                                       │
-│             VERSION=$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/v//')                               │
-│             echo "current_version=$VERSION" >> $GITHUB_OUTPUT                                                                                                                                      │
-│             echo "Current Eye version: v$VERSION"                                                                                                                                                  │
-│           else                                                                                                                                                                                     │
-│             echo "current_version=0.0.0" >> $GITHUB_OUTPUT                                                                                                                                         │
-│             echo "No existing Eye release, will build"                                                                                                                                             │
-│           fi                                                                                                                                                                                       │
-│                                                                                                                                                                                                    │
-│       - name: Compare versions                                                                                                                                                                     │
-│         id: compare                                                                                                                                                                                │
-│         run: |                                                                                                                                                                                     │
-│           NEW_VER="${{ steps.get-caddy.outputs.caddy_version }}"                                                                                                                                   │
-│           CUR_VER="${{ steps.get-eye.outputs.current_version }}"                                                                                                                                   │
-│           echo "Comparing $NEW_VER > $CUR_VER"                                                                                                                                                     │
-│           if [[ "$NEW_VER" > "$CUR_VER" ]]; then                                                                                                                                                   │
-│             echo "should-build=true" >> $GITHUB_OUTPUT                                                                                                                                             │
-│             echo "Newer version detected: $NEW_VER"                                                                                                                                                │
-│           else                                                                                                                                                                                     │
-│             echo "should-build=false" >> $GITHUB_OUTPUT                                                                                                                                            │
-│             echo "No update needed"                                                                                                                                                                │
-│           fi                                                                                                                                                                                       │
-│                                                                                                                                                                                                    │
-│   build-and-release:                                                                                                                                                                               │
-│     needs: check-version                                                                                                                                                                           │
-│     if: needs.check-version.outputs.should-build == 'true'                                                                                                                                         │
-│     runs-on: ubuntu-latest                                                                                                                                                                         │
-│     permissions:                                                                                                                                                                                   │
-│       contents: write                                                                                                                                                                              │
-│     steps:                                                                                                                                                                                         │
-│       - name: Checkout Eye repo                                                                                                                                                                    │
-│         uses: actions/checkout@v4                                                                                                                                                                  │
-│         with:                                                                                                                                                                                      │
-│           token: ${{ secrets.PRIVATE_REPO_TOKEN }}                                                                                                                                                 │
-│                                                                                                                                                                                                    │
-│       - name: Clone source repo (specific branch)                                                                                                                                                  │
-│         uses: actions/checkout@v4                                                                                                                                                                  │
-│         with:                                                                                                                                                                                      │
-│           repository: ${{ env.SOURCE_REPO }}                                                                                                                                                       │
-│           ref: ${{ env.SOURCE_BRANCH }}                                                                                                                                                            │
-│           path: source                                                                                                                                                                             │
-│           token: ${{ secrets.PRIVATE_REPO_TOKEN }}                                                                                                                                                 │
-│                                                                                                                                                                                                    │
-│       - name: Set up Docker for Debian 11                                                                                                                                                          │
-│         uses: docker/setup-buildx-action@v3                                                                                                                                                        │
-│                                                                                                                                                                                                    │
-│       - name: Build Caddy using xcaddy in Debian 11                                                                                                                                                │
-│         env:                                                                                                                                                                                       │
-│           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}                                                                                                                                          │
-│         run: |                                                                                                                                                                                     │
-│           NEW_VERSION="${{ needs.check-version.outputs.new-version }}"                                                                                                                             │
-│           echo "Building with version: $NEW_VERSION"                                                                                                                                               │
-│           echo "Building from branch: ${{ env.SOURCE_BRANCH }}"                                                                                                                                    │
-│                                                                                                                                                                                                    │
-│           cat > Dockerfile << 'EOF'                                                                                                                                                                │
-│           FROM debian:11                                                                                                                                                                           │
-│           RUN apt-get update && apt-get install -y wget git ca-certificates pkg-config libssl-dev build-essential && rm -rf /var/lib/apt/lists/*                                                   │
-│           RUN wget https://go.dev/dl/go1.25.2.linux-amd64.tar.gz && \                                                                                                                              │
-│               tar -C /usr/local -xzf go1.25.2.linux-amd64.tar.gz && \                                                                                                                              │
-│               rm go1.25.2.linux-amd64.tar.gz                                                                                                                                                       │
-│           ENV GOPATH=/root/go                                                                                                                                                                      │
-│           ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH                                                                                                                                            │
-│           ARG GITHUB_TOKEN                                                                                                                                                                         │
-│           RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"                                                                         │
-│           ENV GOPRIVATE=github.com/simtelboy/caddysinglefile                                                                                                                                       │
-│           RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \                                                                                                                      │
-│               ls -la /root/go/bin/                                                                                                                                                                 │
-│           WORKDIR /app                                                                                                                                                                             │
-│           COPY source/ .                                                                                                                                                                           │
-│           ARG FORWARDPROXY_COMMIT                                                                                                                                                                  │
-│           RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \                                                                                                                        │
-│               --with github.com/caddyserver/forwardproxy=github.com/simtelboy/caddysinglefile@${FORWARDPROXY_COMMIT} && \                                                                          │
-│               ls -la /app/                                                                                                                                                                         │
-│           EOF                                                                                                                                                                                      │
-│                                                                                                                                                                                                    │
-│           docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} --build-arg FORWARDPROXY_COMMIT=${{ env.FORWARDPROXY_COMMIT }} -t caddy-build .                                                    │
-│           docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/                                                                                                                     │
-│           mv caddy caddy-v${NEW_VERSION}-linux-amd64                                                                                                                                               │
-│           chmod +x caddy-v${NEW_VERSION}-linux-amd64                                                                                                                                               │
-│           echo "Built caddy binary: $(ls -lh caddy-v${NEW_VERSION}-linux-amd64)"                                                                                                                   │
-│                                                                                                                                                                                                    │
-│       - name: Create or update Release                                                                                                                                                             │
-│         env:                                                                                                                                                                                       │
-│           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}                                                                                                                                          │
-│         run: |                                                                                                                                                                                     │
-│           NEW_VERSION="${{ needs.check-version.outputs.new-version }}"                                                                                                                             │
-│           echo "Creating release with version: $NEW_VERSION"                                                                                                                                       │
-│           TAG="v$NEW_VERSION"                                                                                                                                                                      │
-│           ASSET_PATH="caddy-v${NEW_VERSION}-linux-amd64"                                                                                                                                           │
-│                                                                                                                                                                                                    │
-│           RELEASE_NOTES="## 天神之眼 v${NEW_VERSION}                                                                                                                                               │
-│                                                                                                                                                                                                    │
-│           ### 📦 编译信息                                                                                                                                                                          │
-│           - **Caddy 版本**: v${NEW_VERSION}                                                                                                                                                        │
-│           - **源代码分支**: \`${{ env.SOURCE_BRANCH }}\`                                                                                                                                           │
-│           - **编译时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')                                                                                                                                      │
-│           - **运行环境**: Debian 11+                                                                                                                                                               │
-│                                                                                                                                                                                                    │
-│           ### 🚀 功能特性                                                                                                                                                                          │
-│           - ✅ 基于 Caddy v${NEW_VERSION}                                                                                                                                                          │
-│           - ✅ 集成正向代理功能                                                                                                                                                                    │
-│           - ✅ 用户管理系统                                                                                                                                                                        │
-│           - ✅ 流量统计与限速                                                                                                                                                                      │
-│                                                                                                                                                                                                    │
-│           ### 📥 安装方法                                                                                                                                                                          │
-│           \`\`\`bash                                                                                                                                                                               │
-│           wget https://github.com/${{ env.TARGET_REPO }}/releases/download/${TAG}/${ASSET_PATH}                                                                                                    │
-│           chmod +x ${ASSET_PATH}                                                                                                                                                                   │
-│           sudo mv ${ASSET_PATH} /usr/local/bin/caddy                                                                                                                                               │
-│           caddy version                                                                                                                                                                            │
-│           \`\`\`                                                                                                                                                                                   │
-│                                                                                                                                                                                                    │
-│           ---                                                                                                                                                                                      │
-│           🤖 本版本由 GitHub Actions 自动编译"                                                                                                                                                     │
-│                                                                                                                                                                                                    │
-│           gh release create "$TAG" --title "天神之眼 v${NEW_VERSION}" --notes "$RELEASE_NOTES" "$ASSET_PATH" \                                                                                     │
-│             --repo ${{ env.TARGET_REPO }} || echo "Release already exists"                                                                                                                         │
-│                                                                                                                                                                                                    │
-│           gh release upload "$TAG" "$ASSET_PATH" --repo ${{ env.TARGET_REPO }} --clobber                                                                                                           │
-│           echo "✅ Released v${NEW_VERSION} with binary: $ASSET_PATH"                
+  name: Auto Build Caddy Single File
+
+  on:
+    schedule:
+      - cron: '0 18 * * 0'
+    workflow_dispatch:
+
+  env:
+    CADDY_REPO: caddyserver/caddy
+    SOURCE_REPO: simtelboy/caddysinglefile
+    SOURCE_BRANCH: feature/rate-limit
+    TARGET_REPO: simtelboy/eye
+    FORWARDPROXY_COMMIT: fd35bce86f7aa1d8e9ae26755fb13a23e5ffd72f
+
+  jobs:
+    check-version:
+      runs-on: ubuntu-latest
+      outputs:
+        should-build: ${{ steps.compare.outputs.should-build }}
+        new-version: ${{ steps.get-caddy.outputs.caddy_version }}
+      steps:
+        - name: Get latest Caddy version
+          id: get-caddy
+          run: |
+            sudo apt-get update && sudo apt-get install -y jq
+            RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ env.CADDY_REPO }}/releases/latest)
+            if [ $? -ne 0 ]; then
+              echo "Failed to fetch Caddy release data"
+              exit 1
+            fi
+            VERSION=$(echo "$RESPONSE" | jq -r '.tag_name' | sed 's/v//')
+            if [ -z "$VERSION" ]; then
+              echo "No valid tag_name found, using default version 0.0.0"
+              VERSION="0.0.0"
+            fi
+            echo "caddy_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Latest Caddy version: v$VERSION"
+
+        - name: Get current Eye version
+          id: get-eye
+          run: |
+            if [ -n "$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep 'tag_name')" ]; then
+              VERSION=$(curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/v//')
+              echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+              echo "Current Eye version: v$VERSION"
+            else
+              echo "current_version=0.0.0" >> $GITHUB_OUTPUT
+              echo "No existing Eye release, will build"
+            fi
+
+        - name: Compare versions
+          id: compare
+          run: |
+            NEW_VER="${{ steps.get-caddy.outputs.caddy_version }}"
+            CUR_VER="${{ steps.get-eye.outputs.current_version }}"
+            echo "Comparing $NEW_VER > $CUR_VER"
+            if [[ "$NEW_VER" > "$CUR_VER" ]]; then
+              echo "should-build=true" >> $GITHUB_OUTPUT
+              echo "Newer version detected: $NEW_VER"
+            else
+              echo "should-build=false" >> $GITHUB_OUTPUT
+              echo "No update needed"
+            fi
+
+    build-and-release:
+      needs: check-version
+      if: needs.check-version.outputs.should-build == 'true'
+      runs-on: ubuntu-latest
+      permissions:
+        contents: write
+      steps:
+        - name: Checkout Eye repo
+          uses: actions/checkout@v4
+          with:
+            token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+        - name: Clone source repo (specific branch)
+          uses: actions/checkout@v4
+          with:
+            repository: ${{ env.SOURCE_REPO }}
+            ref: ${{ env.SOURCE_BRANCH }}
+            path: source
+            token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+        - name: Set up Docker for Debian 11
+          uses: docker/setup-buildx-action@v3
+
+        - name: Build Caddy using xcaddy in Debian 11
+          env:
+            GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          run: |
+            NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
+            echo "Building with version: $NEW_VERSION"
+            echo "Building from branch: ${{ env.SOURCE_BRANCH }}"
+
+            cat > Dockerfile << 'EOF'
+            FROM debian:11
+            RUN apt-get update && apt-get install -y wget git ca-certificates pkg-config libssl-dev build-essential && rm -rf /var/lib/apt/lists/*
+            RUN wget https://go.dev/dl/go1.25.2.linux-amd64.tar.gz && \
+                tar -C /usr/local -xzf go1.25.2.linux-amd64.tar.gz && \
+                rm go1.25.2.linux-amd64.tar.gz
+            ENV GOPATH=/root/go
+            ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH
+            ARG GITHUB_TOKEN
+            RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+            ENV GOPRIVATE=github.com/simtelboy/caddysinglefile
+            RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+                ls -la /root/go/bin/
+            WORKDIR /app
+            COPY source/ .
+            ARG FORWARDPROXY_COMMIT
+            RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \
+                --with github.com/caddyserver/forwardproxy=github.com/simtelboy/caddysinglefile@${FORWARDPROXY_COMMIT} && \
+                ls -la /app/
+            EOF
+
+            docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} --build-arg FORWARDPROXY_COMMIT=${{ env.FORWARDPROXY_COMMIT }} -t caddy-build .
+            docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/
+            mv caddy caddy-v${NEW_VERSION}-linux-amd64
+            chmod +x caddy-v${NEW_VERSION}-linux-amd64
+            echo "Built caddy binary: $(ls -lh caddy-v${NEW_VERSION}-linux-amd64)"
+
+        - name: Create or update Release
+          env:
+            GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          run: |
+            NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
+            echo "Creating release with version: $NEW_VERSION"
+            TAG="v$NEW_VERSION"
+            ASSET_PATH="caddy-v${NEW_VERSION}-linux-amd64"
+
+            RELEASE_NOTES="## 天神之眼 v${NEW_VERSION}
+
+            ### 📦 编译信息
+            - **Caddy 版本**: v${NEW_VERSION}
+            - **源代码分支**: \`${{ env.SOURCE_BRANCH }}\`
+            - **编译时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+            - **运行环境**: Debian 11+
+
+            ### 🚀 功能特性
+            - ✅ 基于 Caddy v${NEW_VERSION}
+            - ✅ 集成正向代理功能
+            - ✅ 用户管理系统
+            - ✅ 流量统计与限速
+
+            ### 📥 安装方法
+            \`\`\`bash
+            wget https://github.com/${{ env.TARGET_REPO }}/releases/download/${TAG}/${ASSET_PATH}
+            chmod +x ${ASSET_PATH}
+            sudo mv ${ASSET_PATH} /usr/local/bin/caddy
+            caddy version
+            \`\`\`
+
+            ---
+            🤖 本版本由 GitHub Actions 自动编译"
+
+            gh release create "$TAG" --title "天神之眼 v${NEW_VERSION}" --notes "$RELEASE_NOTES" "$ASSET_PATH" \
+              --repo ${{ env.TARGET_REPO }} || echo "Release already exists"
+
+            gh release upload "$TAG" "$ASSET_PATH" --repo ${{ env.TARGET_REPO }} --clobber
+            echo "✅ Released v${NEW_VERSION} with binary: $ASSET_PATH"

@@ -1,206 +1,99 @@
-name: Auto Build Caddy Single File
+name: Build Rate Limit Feature
 
-  on:
-    schedule:
-      - cron: '0 18 * * 0'  # 每周日 18:00 UTC
-    workflow_dispatch:       # 手动触发
+on:
+  push:
+    branches: [ feature/rate-limit ]
+  workflow_dispatch:
 
-  env:
-    CADDY_REPO: caddyserver/caddy
-    SOURCE_REPO: simtelboy/caddysinglefile
-    SOURCE_BRANCH: feature/rate-limit  # ✅ 新增：指定分支
-    TARGET_REPO: simtelboy/eye
-    FORWARDPROXY_COMMIT: fd35bce86f7aa1d8e9ae26755fb13a23e5ffd72f
+jobs:
+  build:
+    name: Build Caddy with Rate Limit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-  jobs:
-    check-version:
-      runs-on: ubuntu-latest
-      outputs:
-        should-build: ${{ steps.compare.outputs.should-build }}
-        new-version: ${{ steps.get-caddy.outputs.caddy_version }}
-      steps:
-        - name: Get latest Caddy version
-          id: get-caddy
-          run: |
-            sudo apt-get update && sudo apt-get install -y jq
-            RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              https://api.github.com/repos/${{ env.CADDY_REPO }}/releases/latest)
-            if [ $? -ne 0 ]; then
-              echo "Failed to fetch Caddy release data"
-              exit 1
-            fi
-            VERSION=$(echo "$RESPONSE" | jq -r '.tag_name' | sed 's/v//')
-            if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-              echo "No valid tag_name found, using default version 0.0.0"
-              VERSION="0.0.0"
-            fi
-            echo "caddy_version=$VERSION" >> $GITHUB_OUTPUT
-            echo "Latest Caddy version: v$VERSION"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        - name: Get current Eye version
-          id: get-eye
-          run: |
-            RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest)
-            if echo "$RESPONSE" | grep -q 'tag_name'; then
-              VERSION=$(echo "$RESPONSE" | jq -r '.tag_name' | sed 's/v//')
-              echo "current_version=$VERSION" >> $GITHUB_OUTPUT
-              echo "Current Eye version: v$VERSION"
-            else
-              echo "current_version=0.0.0" >> $GITHUB_OUTPUT
-              echo "No existing Eye release, will build"
-            fi
+      - name: Get current commit hash
+        id: get-commit
+        run: |
+          COMMIT_HASH=$(git rev-parse HEAD)
+          SHORT_HASH="${COMMIT_HASH:0:7}"
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          echo "short_hash=$SHORT_HASH" >> $GITHUB_OUTPUT
+          echo "Building with commit: $COMMIT_HASH (short: $SHORT_HASH)"
 
-        - name: Compare versions
-          id: compare
-          run: |
-            NEW_VER="${{ steps.get-caddy.outputs.caddy_version }}"
-            CUR_VER="${{ steps.get-eye.outputs.current_version }}"
-            echo "Comparing $NEW_VER > $CUR_VER"
-            if [[ "$NEW_VER" > "$CUR_VER" ]] || [[ "$NEW_VER" == "0.0.0" ]]; then
-              echo "should-build=true" >> $GITHUB_OUTPUT
-              echo "Newer version detected: $NEW_VER"
-            else
-              echo "should-build=false" >> $GITHUB_OUTPUT
-              echo "No update needed"
-            fi
+      - name: Set up Docker for Debian 11
+        uses: docker/setup-buildx-action@v3
 
-    build-and-release:
-      needs: check-version
-      if: needs.check-version.outputs.should-build == 'true'
-      runs-on: ubuntu-latest
-      permissions:
-        contents: write
-      steps:
-        - name: Checkout Eye repo
-          uses: actions/checkout@v4
-          with:
-            token: ${{ secrets.PRIVATE_REPO_TOKEN }}  # ✅ 使用私有 Token
+      - name: Build Caddy using xcaddy in Debian 11
+        run: |
+          COMMIT_HASH="${{ steps.get-commit.outputs.commit_hash }}"
+          SHORT_HASH="${{ steps.get-commit.outputs.short_hash }}"
+          echo "Building with commit: $COMMIT_HASH (short: $SHORT_HASH)"
 
-        # ✅ 修改：使用 Token 和指定分支克隆私有仓库
-        - name: Clone private source repo (specific branch)
-          uses: actions/checkout@v4
-          with:
-            repository: ${{ env.SOURCE_REPO }}
-            ref: ${{ env.SOURCE_BRANCH }}  # ✅ 指定分支
-            path: source
-            token: ${{ secrets.PRIVATE_REPO_TOKEN }}  # ✅ 使用私有 Token
+          # ✅ 创建 Dockerfile（使用本地代码）
+          cat > Dockerfile << 'EOF'
+          FROM debian:11
 
-        - name: Set up Docker for Debian 11
-          uses: docker/setup-buildx-action@v3
+          # 安装依赖
+          RUN apt-get update && apt-get install -y \
+              wget git ca-certificates pkg-config \
+              libssl-dev build-essential && \
+              rm -rf /var/lib/apt/lists/*
 
-        - name: Build Caddy using xcaddy in Debian 11
-          env:
-            GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}  # ✅ 使用私有 Token
-          run: |
-            NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
-            echo "Building with version: $NEW_VERSION"
-            echo "Building from branch: ${{ env.SOURCE_BRANCH }}"
+          # 安装 Go 1.25.2
+          RUN wget https://go.dev/dl/go1.25.2.linux-amd64.tar.gz && \
+              tar -C /usr/local -xzf go1.25.2.linux-amd64.tar.gz && \
+              rm go1.25.2.linux-amd64.tar.gz
 
-            # 创建 Dockerfile
-            cat > Dockerfile << 'EOF'
-            FROM debian:11
+          # 设置环境变量
+          ENV GOPATH=/root/go
+          ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH
 
-            # 安装依赖
-            RUN apt-get update && apt-get install -y \
-                wget git ca-certificates pkg-config \
-                libssl-dev build-essential && \
-                rm -rf /var/lib/apt/lists/*
+          # 安装 xcaddy
+          RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+              ls -la /root/go/bin/
 
-            # 安装 Go 1.25.2
-            RUN wget https://go.dev/dl/go1.25.2.linux-amd64.tar.gz && \
-                tar -C /usr/local -xzf go1.25.2.linux-amd64.tar.gz && \
-                rm go1.25.2.linux-amd64.tar.gz
+          # 设置工作目录
+          WORKDIR /app
 
-            # 设置环境变量
-            ENV GOPATH=/root/go
-            ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH
+          # ✅ 复制当前仓库代码
+          COPY . .
 
-            # 配置 Git 使用 Token（运行时传入）
-            ARG GITHUB_TOKEN
-            RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
+          # ✅ 使用本地路径编译（不需要访问远程仓库）
+          RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \
+              --with github.com/caddyserver/forwardproxy=./ && \
+              chmod +x /app/caddy && \
+              ls -lh /app/caddy
+          EOF
 
-            # 安装 xcaddy
-            RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
-                ls -la /root/go/bin/
+          # ✅ 构建（不需要传递 GITHUB_TOKEN）
+          docker build -t caddy-ratelimit-build . || {
+            echo "Docker build failed"
+            exit 1
+          }
 
-            WORKDIR /app
-            COPY source/ .
+          # 提取二进制文件
+          docker run --rm -v $(pwd):/output caddy-ratelimit-build sh -c "cp /app/caddy /output/caddy && chmod 755 /output/caddy"
 
-            # 编译 Caddy
-            ARG FORWARDPROXY_COMMIT
-            RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \
-                --with github.com/caddyserver/forwardproxy=github.com/simtelboy/caddysinglefile@${FORWARDPROXY_COMMIT} && \
-                ls -la /app/
-            EOF
+          # 重命名
+          mv caddy caddy-ratelimit-${SHORT_HASH}-linux-amd64
 
-            # 构建 Docker 镜像（传递 Token 和 Commit）
-            docker build \
-              --build-arg GITHUB_TOKEN=${{ secrets.PRIVATE_REPO_TOKEN }} \
-              --build-arg FORWARDPROXY_COMMIT=${{ env.FORWARDPROXY_COMMIT }} \
-              -t caddy-build .
+          # 显示文件信息
+          echo "✅ Built caddy binary: $(ls -lh caddy-ratelimit-${SHORT_HASH}-linux-amd64)"
 
-            # 提取二进制文件
-            docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/
+          # 验证二进制文件
+          file caddy-ratelimit-${SHORT_HASH}-linux-amd64
 
-            # 重命名二进制
-            mv caddy caddy-v${NEW_VERSION}-linux-amd64
-            chmod +x caddy-v${NEW_VERSION}-linux-amd64
+          # 清理 Docker 镜像
+          docker rmi caddy-ratelimit-build
 
-            echo "Built caddy binary: $(ls -lh caddy-v${NEW_VERSION}-linux-amd64)"
-
-        - name: Create or update Release
-          env:
-            GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}  # ✅ 使用私有 Token
-          run: |
-            NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
-            echo "Creating release with version: $NEW_VERSION"
-            TAG="v$NEW_VERSION"
-            ASSET_PATH="caddy-v${NEW_VERSION}-linux-amd64"
-
-            # 创建 Release Notes
-            RELEASE_NOTES="## 天神之眼 v${NEW_VERSION}
-
-            ### 📦 编译信息
-            - **Caddy 版本**: v${NEW_VERSION}
-            - **源代码分支**: \`${{ env.SOURCE_BRANCH }}\`
-            - **编译时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-            - **运行环境**: Debian 11+
-
-            ### 🚀 功能特性
-            - ✅ 基于 Caddy v${NEW_VERSION}
-            - ✅ 集成正向代理功能
-            - ✅ 用户管理系统
-            - ✅ 流量统计与限速
-
-            ### 📥 安装方法
-            \`\`\`bash
-            # 下载二进制
-            wget https://github.com/${{ env.TARGET_REPO }}/releases/download/${TAG}/${ASSET_PATH}
-
-            # 赋予执行权限
-            chmod +x ${ASSET_PATH}
-
-            # 移动到系统路径
-            sudo mv ${ASSET_PATH} /usr/local/bin/caddy
-
-            # 验证安装
-            caddy version
-            \`\`\`
-
-            ---
-            🤖 本版本由 GitHub Actions 自动编译"
-
-            # 创建 Release（如果已存在则跳过）
-            gh release create "$TAG" \
-              --title "天神之眼 v${NEW_VERSION}" \
-              --notes "$RELEASE_NOTES" \
-              "$ASSET_PATH" \
-              --repo ${{ env.TARGET_REPO }} || echo "Release already exists"
-
-            # 上传或更新资产
-            gh release upload "$TAG" "$ASSET_PATH" \
-              --repo ${{ env.TARGET_REPO }} \
-              --clobber
-
-            echo "✅ Released v${NEW_VERSION} with binary: $ASSET_PATH"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: caddy-ratelimit-linux-amd64
+          path: caddy-ratelimit-*-linux-amd64
+          retention-days: 7

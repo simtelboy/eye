@@ -10,7 +10,7 @@
     SOURCE_REPO: simtelboy/caddysinglefile
     SOURCE_BRANCH: feature/rate-limit
     TARGET_REPO: simtelboy/eye
-    FORWARDPROXY_COMMIT: ea64fe2b4dc2767391e11b2311bef003418671e4
+    FORWARDPROXY_COMMIT: 46afb92f891e806ff76e7a77f4e54ad1f109addc
 
   jobs:
     check-version:

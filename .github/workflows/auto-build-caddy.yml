@@ -141,7 +141,7 @@ jobs:
           ### 📥 安装方法
           ```bash
           # 一键下载安装最新版本（推荐）
-          curl -s https://api.github.com/repos/$TARGET_REPO/releases/latest | grep "browser_download_url.*linux-amd64" | cut -d '"' -f 4 | wget -qi - -O caddy && chmod +x caddy && ./caddy install
+          curl -s https://api.github.com/repos/$TARGET_REPO/releases/latest | grep "browser_download_url.*linux-amd64" | cut -d '"' -f 4 | tr -d '\n' | xargs -I {} wget {} -O caddy && chmod +x caddy && ./caddy install
           
           # 或者下载指定版本一键安装
           wget https://github.com/$TARGET_REPO/releases/download/$TAG/$ASSET_PATH -O caddy && chmod +x caddy && sudo mv caddy /usr/local/bin/caddy && caddy version

@@ -125,37 +125,36 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
           NEW_VERSION="${{ needs.check-version.outputs.new-version }}"
-          echo "Creating release with version: $NEW_VERSION"
           TAG="v$NEW_VERSION"
           ASSET_PATH="caddy-v${NEW_VERSION}-linux-amd64"
+          BUILD_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
-          RELEASE_NOTES="## 天神之眼 v${NEW_VERSION}
+          echo "Creating release with version: $NEW_VERSION"
+
+          cat > release_notes.md << 'NOTES_EOF'
+          ## 天神之眼 v$NEW_VERSION
 
           ### 📦 编译信息
-          - **Caddy 版本**: v${NEW_VERSION}
-          - **源代码分支**: \`${{ env.SOURCE_BRANCH }}\`
-          - **编译时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - **编译时间**: $BUILD_TIME
           - **运行环境**: Debian 11+
 
-          ### 🚀 功能特性
-          - ✅ 基于 Caddy v${NEW_VERSION}
-          - ✅ 集成正向代理功能
-          - ✅ 用户管理系统
-          - ✅ 流量统计与限速
-
           ### 📥 安装方法
-          \`\`\`bash
+          ```bash
           # 一键下载安装最新版本（推荐）
-          curl -s https://api.github.com/repos/${{ env.TARGET_REPO }}/releases/latest | grep "browser_download_url.*linux-amd64" | cut -d '"' -f 4 | wget -qi - -O caddy && chmod +x caddy && ./caddy install
+          curl -s https://api.github.com/repos/$TARGET_REPO/releases/latest | grep "browser_download_url.*linux-amd64" | cut -d '"' -f 4 | wget -qi - -O caddy && chmod +x caddy && ./caddy install
           
           # 或者下载指定版本一键安装
-          wget https://github.com/${{ env.TARGET_REPO }}/releases/download/${TAG}/${ASSET_PATH} -O caddy && chmod +x caddy && sudo mv caddy /usr/local/bin/caddy && caddy version
-          \`\`\`
+          wget https://github.com/$TARGET_REPO/releases/download/$TAG/$ASSET_PATH -O caddy && chmod +x caddy && sudo mv caddy /usr/local/bin/caddy && caddy version
+          ```
+          NOTES_EOF
 
-          ---
-          🤖 本版本由 GitHub Actions 自动编译"
+          sed -i "s|\$NEW_VERSION|$NEW_VERSION|g" release_notes.md
+          sed -i "s|\$BUILD_TIME|$BUILD_TIME|g" release_notes.md
+          sed -i "s|\$TARGET_REPO|${{ env.TARGET_REPO }}|g" release_notes.md
+          sed -i "s|\$TAG|$TAG|g" release_notes.md
+          sed -i "s|\$ASSET_PATH|$ASSET_PATH|g" release_notes.md
 
-          gh release create "$TAG" --title "天神之眼 v${NEW_VERSION}" --notes "$RELEASE_NOTES" "$ASSET_PATH" \
+          gh release create "$TAG" --title "天神之眼 v${NEW_VERSION}" --notes-file release_notes.md "$ASSET_PATH" \
             --repo ${{ env.TARGET_REPO }} || echo "Release already exists"
 
           gh release upload "$TAG" "$ASSET_PATH" --repo ${{ env.TARGET_REPO }} --clobber

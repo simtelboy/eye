@@ -10,7 +10,7 @@ env:
   SOURCE_REPO: simtelboy/caddysinglefile
   SOURCE_BRANCH: feature/rate-limit
   TARGET_REPO: simtelboy/eye
-  FORWARDPROXY_COMMIT: fd35bce86f7aa1d8e9ae26755fb13a23e5ffd72f
+  FORWARDPROXY_COMMIT: e8acc35c708ca7464d5dbe04222b55cb678aa092
 
 jobs:
   check-version:
@@ -102,21 +102,22 @@ jobs:
           ENV GOPATH=/root/go
           ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH
           ARG GITHUB_TOKEN
-          RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com" && \
-              go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
+          RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          ENV GOPRIVATE=github.com/simtelboy/caddysinglefile
+          RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && \
               ls -la /root/go/bin/
           WORKDIR /app
           COPY source/ .
           ARG FORWARDPROXY_COMMIT
           RUN CGO_ENABLED=1 /root/go/bin/xcaddy build --output /app/caddy \
               --with github.com/caddyserver/forwardproxy=github.com/simtelboy/caddysinglefile@${FORWARDPROXY_COMMIT} && \
+              chmod +x /app/caddy && \
               ls -la /app/
           EOF
 
           docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} --build-arg FORWARDPROXY_COMMIT=${{ env.FORWARDPROXY_COMMIT }} -t caddy-build .
           docker run --rm -v $(pwd):/output caddy-build cp /app/caddy /output/
           mv caddy caddy-v${NEW_VERSION}-linux-amd64
-          chmod +x caddy-v${NEW_VERSION}-linux-amd64
           echo "Built caddy binary: $(ls -lh caddy-v${NEW_VERSION}-linux-amd64)"
 
       - name: Create or update Release
